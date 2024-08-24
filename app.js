@@ -1,7 +1,6 @@
 let map, userMarker;
 const API_KEY = 'fsq3IZII1s3WFZM3S0RiaElc5/8KN+DVrARGuYnD/7XvZuQ='; // Replace with your actual API key
 
-
 function init() {
     initMap();
     getUserLocation();
@@ -17,7 +16,9 @@ function init() {
 
 function initMap() {
     map = L.map('map').setView([0, 0], 2);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
 }
 
 function getUserLocation() {
@@ -85,7 +86,6 @@ function findPlaces(includeRating) {
 
     const limit = includeRating ? 15 : 5;
 
-    // Updated URL without fsq_rating
     const url = `https://api.foursquare.com/v3/places/search?query=${category}&ll=${lat},${lng}&sort=DISTANCE&limit=${limit}&fields=name,geocodes,rating`;
 
     console.log('Request URL:', url);
@@ -143,7 +143,8 @@ function findPlaces(includeRating) {
 }
 
 function displayResults(places, includeRating) {
-    document.getElementById('results').innerHTML = '';
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.innerHTML = '';
     map.eachLayer((layer) => {
         if(layer !== userMarker && !(layer instanceof L.TileLayer)) {
             map.removeLayer(layer);
@@ -152,16 +153,21 @@ function displayResults(places, includeRating) {
 
     places.forEach((place, index) => {
         L.marker([place.lat, place.lng]).addTo(map)
-            .bindPopup(`${place.name}<br>Rating: ${place.rating ? place.rating.toFixed(1) : 'Not Available'}`);
+            .bindPopup(`<strong>${place.name}</strong><br>Rating: ${place.rating ? place.rating.toFixed(1) : 'N/A'}`);
 
         const placeElement = document.createElement('div');
+        placeElement.className = 'result-item';
         placeElement.innerHTML = `
             <h3>${index + 1}. ${place.name}</h3>
             <p>Rating: ${place.rating ? place.rating.toFixed(1) : 'Not Available'}</p>
             <p>Distance: ${place.distance.toFixed(2)} km</p>
         `;
-        document.getElementById('results').appendChild(placeElement);
+        resultsDiv.appendChild(placeElement);
     });
+
+    if (places.length === 0) {
+        resultsDiv.innerHTML = '<p>No places found. Try a different location or category.</p>';
+    }
 }
 
 function distance(latlng1, latlng2) {
