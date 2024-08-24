@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nearest Food & Drink</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+</head>
+<body>
+    <div id="app">
+        <h1>Nearest Food & Drink</h1>
+        <div id="location-input">
+            <input type="text" id="location-search" placeholder="Enter a location">
+            <button id="search-btn">Search</button>
+        </div>
+        <select id="category">
+            <option value="restaurant">Restaurants</option>
+            <option value="cafe">Cafes</option>
+            <option value="bar">Bars</option>
+        </select>
+        <button id="nearest-btn">Find Nearest</button>
+        <button id="nearest-rated-btn">Find Nearest + Highly Rated</button>
+        <div id="map"></div>
+        <div id="results"></div>
+    </div>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
