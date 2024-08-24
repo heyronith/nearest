@@ -16,9 +16,7 @@ function init() {
 
 function initMap() {
     map = L.map('map').setView([0, 0], 2);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 }
 
 function getUserLocation() {
@@ -152,16 +150,26 @@ function displayResults(places, includeRating) {
     });
 
     places.forEach((place, index) => {
-        L.marker([place.lat, place.lng]).addTo(map)
+        const marker = L.marker([place.lat, place.lng]).addTo(map)
             .bindPopup(`<strong>${place.name}</strong><br>Rating: ${place.rating ? place.rating.toFixed(1) : 'N/A'}`);
 
         const placeElement = document.createElement('div');
         placeElement.className = 'result-item';
         placeElement.innerHTML = `
             <h3>${index + 1}. ${place.name}</h3>
-            <p>Rating: ${place.rating ? place.rating.toFixed(1) : 'Not Available'}</p>
-            <p>Distance: ${place.distance.toFixed(2)} km</p>
+            <div class="result-details">
+                <p>Rating: ${place.rating ? place.rating.toFixed(1) : 'Not Available'}</p>
+                <p>Distance: ${place.distance.toFixed(2)} km</p>
+            </div>
         `;
+
+        placeElement.addEventListener('click', function() {
+            this.querySelector('.result-details').style.display = 
+                this.querySelector('.result-details').style.display === 'none' ? 'block' : 'none';
+            map.setView([place.lat, place.lng], 15);
+            marker.openPopup();
+        });
+
         resultsDiv.appendChild(placeElement);
     });
 
