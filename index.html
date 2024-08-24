@@ -4,23 +4,106 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nearest Food & Drink</title>
-    <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --primary-light: #5dade2;
+            --primary-dark: #2980b9;
+            --text-color: #333;
+            --background-color: #f5f5f5;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--background-color);
+            margin: 0;
+            padding: 0;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        #map {
+            height: 400px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .input-group {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        
+        input, select, button {
+            padding: 10px;
+            border: 1px solid var(--primary-light);
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        input, select {
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+        
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        button:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        #results {
+            display: grid;
+            gap: 20px;
+        }
+        
+        .result-item {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .result-item h3 {
+            color: var(--primary-color);
+            margin-top: 0;
+        }
+    </style>
 </head>
 <body>
-    <div id="app">
+    <div class="container">
         <h1>Nearest Food & Drink</h1>
-        <div id="location-input">
+        <div class="input-group">
             <input type="text" id="location-search" placeholder="Enter a location">
             <button id="search-btn">Search</button>
         </div>
-        <select id="category">
-            <option value="restaurant">Restaurants</option>
-            <option value="cafe">Cafes</option>
-            <option value="bar">Bars</option>
-        </select>
-        <button id="nearest-btn">Find Nearest</button>
-        <button id="nearest-rated-btn">Find Nearest + Highly Rated</button>
+        <div class="input-group">
+            <select id="category">
+                <option value="restaurant">Restaurants</option>
+                <option value="cafe">Cafes</option>
+                <option value="bar">Bars</option>
+            </select>
+            <button id="nearest-btn">Find Nearest</button>
+            <button id="nearest-rated-btn">Nearest + Rated</button>
+        </div>
         <div id="map"></div>
         <div id="results"></div>
     </div>
