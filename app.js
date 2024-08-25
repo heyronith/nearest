@@ -5,11 +5,32 @@ function init() {
     document.getElementById('nearest-btn').addEventListener('click', () => findPlaces(false));
     document.getElementById('nearest-rated-btn').addEventListener('click', () => findPlaces(true));
     document.getElementById('location-search').addEventListener('input', debounce(autocompleteLocation, 300));
-    document.getElementById('location-search').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            findPlaces(false);
-        }
-    });
+    
+    // Try to get user's location first
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            reverseGeocode(lat, lon);
+            initMap(lat, lon);
+        }, function(error) {
+            console.error("Geolocation error:", error);
+            alert("Unable to get your location. Please enter a location manually.");
+        });
+    } else {
+        alert("Geolocation is not supported by this browser. Please enter a location manually.");
+    }
+}
+
+function reverseGeocode(lat, lon) {
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.address && data.address.city) {
+                document.getElementById('location-search').value = `${data.address.city}, ${data.address.state}, USA`;
+            }
+        })
+        .catch(error => console.error('Reverse geocoding error:', error));
 }
 
 function initMap(lat, lng) {
@@ -22,6 +43,30 @@ function initMap(lat, lng) {
     document.getElementById('map-container').style.height = '400px';
 }
 
+function autocompleteLocation() {
+    const input = document.getElementById('location-search').value;
+    if (input.length < 3) return;
+
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}&countrycodes=us&limit=5`)
+        .then(response => response.json())
+        .then(data => {
+            const autocompleteResults = document.getElementById('autocomplete-results');
+            autocompleteResults.innerHTML = '';
+            data.forEach(result => {
+                if (result.display_name.includes("United States")) {
+                    const div = document.createElement('div');
+                    div.textContent = result.display_name;
+                    div.addEventListener('click', () => {
+                        document.getElementById('location-search').value = result.display_name;
+                        autocompleteResults.innerHTML = '';
+                    });
+                    autocompleteResults.appendChild(div);
+                }
+            });
+        })
+        .catch(error => console.error('Autocomplete error:', error));
+}
+
 function findPlaces(includeRating) {
     const location = document.getElementById('location-search').value;
     const category = document.getElementById('category').value;
@@ -31,8 +76,7 @@ function findPlaces(includeRating) {
         return;
     }
 
-    // First, geocode the location
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}`)
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&countrycodes=us&limit=1`)
         .then(response => response.json())
         .then(data => {
             if (data.length > 0) {
@@ -51,15 +95,19 @@ function findPlaces(includeRating) {
 }
 
 function fetchFoursquareData(lat, lon, category, includeRating) {
-    const url = `https://api.foursquare.com/v3/places/search?query=${category}&ll=${lat},${lon}&sort=DISTANCE&limit=15`;
+    const url = `https://api.foursquare.com/v3/places/search?query=${category}&ll=${lat},${lon}&sort=DISTANCE&limit=15&fields=name,geocodes,rating,stats,distance`;
+
+    console.log('Fetching from URL:', url);
+    console.log('API Key used:', API_KEY.substring(0, 5) + '...');
 
     fetch(url, {
         headers: {
-            'Authorization': `Bearer ${API_KEY}`,
+            'Authorization': API_KEY,
             'Accept': 'application/json'
         }
     })
     .then(response => {
+        console.log('Response status:', response.status);
         if (!response.ok) {
             return response.text().then(text => {
                 throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
@@ -68,17 +116,18 @@ function fetchFoursquareData(lat, lon, category, includeRating) {
         return response.json();
     })
     .then(data => {
-        console.log('Foursquare API response:', data); // For debugging
+        console.log('Foursquare API response:', data);
         let places = data.results.map(place => ({
             name: place.name,
             lat: place.geocodes.main.latitude,
             lng: place.geocodes.main.longitude,
-            rating: place.rating ? place.rating : null,
-            distance: place.distance ? place.distance / 1000 : null // Convert to km if available
+            rating: place.rating,
+            reviewCount: place.stats ? place.stats.total_ratings : 'N/A',
+            distance: place.distance / 1000 // Convert to km
         }));
 
         if (includeRating) {
-            places = places.filter(place => place.rating !== null);
+            places = places.filter(place => place.rating !== undefined);
             places.sort((a, b) => (b.rating / b.distance) - (a.rating / a.distance));
         } else {
             places.sort((a, b) => a.distance - b.distance);
@@ -113,7 +162,7 @@ function displayResults(places, userLocation) {
         placeElement.innerHTML = `
             <h3>${index + 1}. ${place.name}</h3>
             <div class="result-details">
-                <p>Rating: ${place.rating ? place.rating.toFixed(1) : 'Not Available'}</p>
+                <p>Rating: ${place.rating ? place.rating.toFixed(1) : 'Not Available'} (${place.reviewCount} reviews)</p>
                 <p>Distance: ${place.distance.toFixed(2)} km</p>
                 <a href="https://www.google.com/maps/dir/?api=1&origin=${userLocation.lat},${userLocation.lon}&destination=${place.lat},${place.lng}" target="_blank" class="directions-link">
                     Get Directions
@@ -129,29 +178,6 @@ function displayResults(places, userLocation) {
 
         resultsDiv.appendChild(placeElement);
     });
-}
-
-function autocompleteLocation() {
-    const input = document.getElementById('location-search').value;
-    if (input.length < 3) return;
-
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}`)
-        .then(response => response.json())
-        .then(data => {
-            const results = data.slice(0, 5);
-            const autocompleteResults = document.getElementById('autocomplete-results');
-            autocompleteResults.innerHTML = '';
-            results.forEach(result => {
-                const div = document.createElement('div');
-                div.textContent = result.display_name;
-                div.addEventListener('click', () => {
-                    document.getElementById('location-search').value = result.display_name;
-                    autocompleteResults.innerHTML = '';
-                });
-                autocompleteResults.appendChild(div);
-            });
-        })
-        .catch(error => console.error('Autocomplete error:', error));
 }
 
 function debounce(func, delay) {
