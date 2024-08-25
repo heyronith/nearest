@@ -55,22 +55,26 @@ function fetchFoursquareData(lat, lon, category, includeRating) {
 
     fetch(url, {
         headers: {
-            'Authorization': API_KEY
+            'Authorization': `Bearer ${API_KEY}`,
+            'Accept': 'application/json'
         }
     })
     .then(response => {
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            return response.text().then(text => {
+                throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
+            });
         }
         return response.json();
     })
     .then(data => {
+        console.log('Foursquare API response:', data); // For debugging
         let places = data.results.map(place => ({
             name: place.name,
             lat: place.geocodes.main.latitude,
             lng: place.geocodes.main.longitude,
-            rating: place.rating ? place.rating / 2 : null,
-            distance: distance({lat, lng: lon}, {lat: place.geocodes.main.latitude, lng: place.geocodes.main.longitude})
+            rating: place.rating ? place.rating : null,
+            distance: place.distance ? place.distance / 1000 : null // Convert to km if available
         }));
 
         if (includeRating) {
@@ -84,7 +88,7 @@ function fetchFoursquareData(lat, lon, category, includeRating) {
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred while fetching places. Please try again.');
+        alert('An error occurred while fetching places: ' + error.message);
     });
 }
 
