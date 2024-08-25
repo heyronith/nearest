@@ -1,113 +1,99 @@
 let map, userMarker;
-const API_KEY = 'fsq3sZuimynM0NUYFhl4UBhd/YqEyOo4UB2NJtUyonpJqUU='; // Replace with your actual Foursquare API key
+const API_KEY = 'fsq3sZuimynM0NUYFhl4UBhd/YqEyOo4UB2NJtUyonpJqUU='; // Replace with your actual API key
 
 function init() {
     document.getElementById('nearest-btn').addEventListener('click', () => findPlaces(false));
     document.getElementById('nearest-rated-btn').addEventListener('click', () => findPlaces(true));
-    document.getElementById('location-search').addEventListener('input', debounce(autocompleteLocation, 300));
-    
-    // Try to get user's location first
-    if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(function(position) {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
-            reverseGeocode(lat, lon);
-            initMap(lat, lon);
-        }, function(error) {
-            console.error("Geolocation error:", error);
-            alert("Unable to get your location. Please enter a location manually.");
-        });
-    } else {
-        alert("Geolocation is not supported by this browser. Please enter a location manually.");
-    }
+    document.getElementById('search-btn').addEventListener('click', searchLocation);
+    document.getElementById('location-search').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            searchLocation();
+        }
+    });
 }
 
-function reverseGeocode(lat, lon) {
-    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.address && data.address.city) {
-                document.getElementById('location-search').value = `${data.address.city}, ${data.address.state}, USA`;
-            }
-        })
-        .catch(error => console.error('Reverse geocoding error:', error));
-}
-
-function initMap(lat, lng) {
+function initMap() {
     if (!map) {
-        map = L.map('map').setView([lat, lng], 13);
+        map = L.map('map').setView([0, 0], 2);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    } else {
-        map.setView([lat, lng], 13);
     }
     document.getElementById('map-container').style.height = '400px';
 }
 
-function autocompleteLocation() {
-    const input = document.getElementById('location-search').value;
-    if (input.length < 3) return;
-
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}&countrycodes=us&limit=5`)
-        .then(response => response.json())
-        .then(data => {
-            const autocompleteResults = document.getElementById('autocomplete-results');
-            autocompleteResults.innerHTML = '';
-            data.forEach(result => {
-                if (result.display_name.includes("United States")) {
-                    const div = document.createElement('div');
-                    div.textContent = result.display_name;
-                    div.addEventListener('click', () => {
-                        document.getElementById('location-search').value = result.display_name;
-                        autocompleteResults.innerHTML = '';
-                    });
-                    autocompleteResults.appendChild(div);
-                }
+function getUserLocation() {
+    return new Promise((resolve, reject) => {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                resolve({lat: position.coords.latitude, lng: position.coords.longitude});
+            }, function(error) {
+                reject("Unable to get your location. Please enter a location manually.");
             });
-        })
-        .catch(error => console.error('Autocomplete error:', error));
+        } else {
+            reject("Geolocation is not supported by this browser. Please enter a location manually.");
+        }
+    });
 }
 
-function findPlaces(includeRating) {
-    const location = document.getElementById('location-search').value;
-    const category = document.getElementById('category').value;
-
-    if (!location) {
+function searchLocation() {
+    const query = document.getElementById('location-search').value;
+    if (!query) {
         alert("Please enter a location to search.");
         return;
     }
 
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&countrycodes=us&limit=1`)
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
         .then(response => response.json())
         .then(data => {
             if (data.length > 0) {
-                const lat = data[0].lat;
-                const lon = data[0].lon;
-                initMap(lat, lon);
-                fetchFoursquareData(lat, lon, category, includeRating);
+                updateMap(data[0].lat, data[0].lon, data[0].display_name);
             } else {
                 alert("Location not found. Please try a different search term.");
             }
         })
         .catch(error => {
-            console.error('Geocoding error:', error);
+            console.error('Location search error:', error);
             alert("An error occurred while searching for the location. Please try again.");
         });
 }
 
-function fetchFoursquareData(lat, lon, category, includeRating) {
-    const url = `https://api.foursquare.com/v3/places/search?query=${category}&ll=${lat},${lon}&sort=DISTANCE&limit=15&fields=name,geocodes,rating,stats,distance`;
+function updateMap(lat, lon, popupText) {
+    initMap();
+    map.setView([lat, lon], 13);
+    if (userMarker) {
+        map.removeLayer(userMarker);
+    }
+    userMarker = L.marker([lat, lon]).addTo(map).bindPopup(popupText).openPopup();
+}
 
-    console.log('Fetching from URL:', url);
-    console.log('API Key used:', API_KEY.substring(0, 5) + '...');
+function findPlaces(includeRating) {
+    if (!userMarker) {
+        getUserLocation()
+            .then(coords => {
+                updateMap(coords.lat, coords.lng, "Your Location");
+                fetchPlaces(coords.lat, coords.lng, includeRating);
+            })
+            .catch(error => {
+                alert(error);
+            });
+    } else {
+        const lat = userMarker.getLatLng().lat;
+        const lng = userMarker.getLatLng().lng;
+        fetchPlaces(lat, lng, includeRating);
+    }
+}
+
+function fetchPlaces(lat, lng, includeRating) {
+    const category = document.getElementById('category').value;
+    const limit = includeRating ? 15 : 5;
+
+    const url = `https://api.foursquare.com/v3/places/search?query=${category}&ll=${lat},${lng}&sort=DISTANCE&limit=${limit}&fields=name,geocodes,rating`;
 
     fetch(url, {
         headers: {
-            'Authorization': API_KEY,
-            'Accept': 'application/json'
+            'Authorization': API_KEY
         }
     })
     .then(response => {
-        console.log('Response status:', response.status);
         if (!response.ok) {
             return response.text().then(text => {
                 throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
@@ -116,27 +102,30 @@ function fetchFoursquareData(lat, lon, category, includeRating) {
         return response.json();
     })
     .then(data => {
-        console.log('Foursquare API response:', data);
+        if (!data.results || data.results.length === 0) {
+            throw new Error('No results found');
+        }
+
         let places = data.results.map(place => ({
             name: place.name,
             lat: place.geocodes.main.latitude,
             lng: place.geocodes.main.longitude,
-            rating: place.rating,
-            reviewCount: place.stats ? place.stats.total_ratings : 'N/A',
-            distance: place.distance / 1000 // Convert to km
+            rating: place.rating ? place.rating / 2 : null,
+            distance: distance({lat, lng}, {lat: place.geocodes.main.latitude, lng: place.geocodes.main.longitude})
         }));
 
         if (includeRating) {
-            places = places.filter(place => place.rating !== undefined);
+            places = places.filter(place => place.rating !== null);
             places.sort((a, b) => (b.rating / b.distance) - (a.rating / a.distance));
         } else {
             places.sort((a, b) => a.distance - b.distance);
         }
 
-        displayResults(places.slice(0, 3), {lat, lon});
+        places = places.slice(0, 3);
+        displayResults(places, {lat, lng});
     })
     .catch(error => {
-        console.error('Error:', error);
+        console.error('Error details:', error);
         alert('An error occurred while fetching places: ' + error.message);
     });
 }
@@ -145,13 +134,10 @@ function displayResults(places, userLocation) {
     const resultsDiv = document.getElementById('results');
     resultsDiv.innerHTML = '';
     map.eachLayer((layer) => {
-        if(!(layer instanceof L.TileLayer)) {
+        if(layer !== userMarker && !(layer instanceof L.TileLayer)) {
             map.removeLayer(layer);
         }
     });
-
-    userMarker = L.marker([userLocation.lat, userLocation.lon]).addTo(map)
-        .bindPopup('Your Location').openPopup();
 
     places.forEach((place, index) => {
         const marker = L.marker([place.lat, place.lng]).addTo(map)
@@ -162,30 +148,27 @@ function displayResults(places, userLocation) {
         placeElement.innerHTML = `
             <h3>${index + 1}. ${place.name}</h3>
             <div class="result-details">
-                <p>Rating: ${place.rating ? place.rating.toFixed(1) : 'Not Available'} (${place.reviewCount} reviews)</p>
+                <p>Rating: ${place.rating ? place.rating.toFixed(1) : 'Not Available'}</p>
                 <p>Distance: ${place.distance.toFixed(2)} km</p>
-                <a href="https://www.google.com/maps/dir/?api=1&origin=${userLocation.lat},${userLocation.lon}&destination=${place.lat},${place.lng}" target="_blank" class="directions-link">
-                    Get Directions
+                <a href="https://www.google.com/maps/dir/?api=1&origin=${userLocation.lat},${userLocation.lng}&destination=${place.lat},${place.lng}" target="_blank" class="directions-link">
+                    <i class="fas fa-directions"></i> Get Directions
                 </a>
             </div>
         `;
 
         placeElement.addEventListener('click', function() {
-            this.classList.toggle('active');
+            this.querySelector('.result-details').style.display = 
+                this.querySelector('.result-details').style.display === 'none' ? 'block' : 'none';
             map.setView([place.lat, place.lng], 15);
             marker.openPopup();
         });
 
         resultsDiv.appendChild(placeElement);
     });
-}
 
-function debounce(func, delay) {
-    let timeoutId;
-    return function (...args) {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => func.apply(this, args), delay);
-    };
+    if (places.length === 0) {
+        resultsDiv.innerHTML = '<p>No places found. Try a different location or category.</p>';
+    }
 }
 
 function distance(coord1, coord2) {
