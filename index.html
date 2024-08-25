@@ -39,6 +39,7 @@
             display: flex;
             justify-content: center;
             margin-bottom: 2rem;
+            position: relative;
         }
         
         input, select, button {
@@ -62,6 +63,28 @@
         
         button:hover {
             transform: scale(1.05);
+        }
+        
+        #autocomplete-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: var(--secondary-color);
+            border-radius: 0 0 25px 25px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        #autocomplete-results div {
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+        
+        #autocomplete-results div:hover {
+            background-color: var(--background-color);
         }
         
         #map-container {
@@ -122,12 +145,14 @@
         <h1>nearest</h1>
         <div class="search-container">
             <input type="text" id="location-search" placeholder="Enter a location">
+            <div id="autocomplete-results"></div>
             <select id="category">
-                <option value="restaurants">Restaurants</option>
-                <option value="cafes">Cafes</option>
-                <option value="bars">Bars</option>
+                <option value="restaurant">Restaurants</option>
+                <option value="cafe">Cafes</option>
+                <option value="bar">Bars</option>
             </select>
-            <button id="search-btn">Find Nearest</button>
+            <button id="nearest-btn">Find Nearest</button>
+            <button id="nearest-rated-btn">Nearest + Rated</button>
         </div>
         <div id="map-container">
             <div id="map"></div>
