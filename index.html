@@ -37,9 +37,14 @@
         
         .search-container {
             display: flex;
+            flex-wrap: wrap;
             justify-content: center;
+            gap: 10px;
             margin-bottom: 2rem;
-            position: relative;
+        }
+        
+        .search-container > * {
+            flex: 1 1 200px;
         }
         
         input, select, button {
@@ -47,10 +52,10 @@
             font-size: 1rem;
             border: none;
             border-radius: 25px;
+            width: 100%;
         }
         
         input, select {
-            margin-right: 10px;
             background-color: var(--secondary-color);
         }
         
@@ -67,15 +72,13 @@
         
         #autocomplete-results {
             position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
             background-color: var(--secondary-color);
             border-radius: 0 0 25px 25px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             z-index: 1000;
             max-height: 200px;
             overflow-y: auto;
+            width: calc(100% - 40px);
         }
         
         #autocomplete-results div {
@@ -144,8 +147,10 @@
     <div class="container">
         <h1>nearest</h1>
         <div class="search-container">
-            <input type="text" id="location-search" placeholder="Enter a location">
-            <div id="autocomplete-results"></div>
+            <div style="position: relative; width: 100%;">
+                <input type="text" id="location-search" placeholder="Enter a location">
+                <div id="autocomplete-results"></div>
+            </div>
             <select id="category">
                 <option value="restaurant">Restaurants</option>
                 <option value="cafe">Cafes</option>
