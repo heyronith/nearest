@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>nearest</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
         :root {
             --primary-color: #000000;
@@ -37,9 +38,14 @@
             text-transform: lowercase;
         }
         
+        #map-container {
+            height: 0;
+            overflow: hidden;
+            transition: height 0.5s ease;
+        }
+        
         #map {
-            height: 400px;
-            margin-bottom: 20px;
+            height: 100%;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
@@ -65,11 +71,15 @@
             background-color: var(--primary-color);
             color: var(--secondary-color);
             cursor: pointer;
-            transition: background-color 0.3s ease;
+            transition: background-color 0.3s ease, transform 0.1s ease;
         }
         
         button:hover {
             background-color: var(--text-color);
+        }
+        
+        button:active {
+            transform: scale(0.98);
         }
         
         #results {
@@ -102,6 +112,17 @@
             padding-top: 10px;
             border-top: 1px solid var(--accent-color);
         }
+        
+        .directions-link {
+            display: inline-block;
+            margin-top: 10px;
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+        
+        .directions-link:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -120,7 +141,9 @@
             <button id="nearest-btn">Find Nearest</button>
             <button id="nearest-rated-btn">Nearest + Rated</button>
         </div>
-        <div id="map"></div>
+        <div id="map-container">
+            <div id="map"></div>
+        </div>
         <div id="results"></div>
     </div>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
