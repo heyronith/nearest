@@ -2,8 +2,6 @@ let map, userMarker;
 const API_KEY = 'fsq3IZII1s3WFZM3S0RiaElc5/8KN+DVrARGuYnD/7XvZuQ='; // Replace with your actual API key
 
 function init() {
-    initMap();
-    getUserLocation();
     document.getElementById('nearest-btn').addEventListener('click', () => findPlaces(false));
     document.getElementById('nearest-rated-btn').addEventListener('click', () => findPlaces(true));
     document.getElementById('search-btn').addEventListener('click', searchLocation);
@@ -15,21 +13,25 @@ function init() {
 }
 
 function initMap() {
-    map = L.map('map').setView([0, 0], 2);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    if (!map) {
+        map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    }
+    document.getElementById('map-container').style.height = '400px';
 }
 
 function getUserLocation() {
-    if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(function(position) {
-            updateMap(position.coords.latitude, position.coords.longitude, "Your Location");
-        }, function(error) {
-            console.error("Geolocation error:", error);
-            alert("Unable to get your location. Please enter a location manually.");
-        });
-    } else {
-        alert("Geolocation is not supported by this browser. Please enter a location manually.");
-    }
+    return new Promise((resolve, reject) => {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                resolve({lat: position.coords.latitude, lng: position.coords.longitude});
+            }, function(error) {
+                reject("Unable to get your location. Please enter a location manually.");
+            });
+        } else {
+            reject("Geolocation is not supported by this browser. Please enter a location manually.");
+        }
+    });
 }
 
 function searchLocation() {
@@ -55,6 +57,7 @@ function searchLocation() {
 }
 
 function updateMap(lat, lon, popupText) {
+    initMap();
     map.setView([lat, lon], 13);
     if (userMarker) {
         map.removeLayer(userMarker);
@@ -64,30 +67,26 @@ function updateMap(lat, lon, popupText) {
 
 function findPlaces(includeRating) {
     if (!userMarker) {
-        alert("Please set a location first.");
-        return;
+        getUserLocation()
+            .then(coords => {
+                updateMap(coords.lat, coords.lng, "Your Location");
+                fetchPlaces(coords.lat, coords.lng, includeRating);
+            })
+            .catch(error => {
+                alert(error);
+            });
+    } else {
+        const lat = userMarker.getLatLng().lat;
+        const lng = userMarker.getLatLng().lng;
+        fetchPlaces(lat, lng, includeRating);
     }
+}
 
+function fetchPlaces(lat, lng, includeRating) {
     const category = document.getElementById('category').value;
-    const lat = userMarker.getLatLng().lat;
-    const lng = userMarker.getLatLng().lng;
-
-    if (isNaN(lat) || isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
-        alert("Invalid coordinates. Please try setting your location again.");
-        return;
-    }
-
-    if (!['restaurant', 'cafe', 'bar'].includes(category)) {
-        alert("Invalid category. Please select a valid category from the dropdown.");
-        return;
-    }
-
     const limit = includeRating ? 15 : 5;
 
     const url = `https://api.foursquare.com/v3/places/search?query=${category}&ll=${lat},${lng}&sort=DISTANCE&limit=${limit}&fields=name,geocodes,rating`;
-
-    console.log('Request URL:', url);
-    console.log('API Key used:', API_KEY.substring(0, 6) + '...');
 
     fetch(url, {
         headers: {
@@ -103,7 +102,6 @@ function findPlaces(includeRating) {
         return response.json();
     })
     .then(data => {
-        console.log('Received data:', data);
         if (!data.results || data.results.length === 0) {
             throw new Error('No results found');
         }
@@ -113,10 +111,8 @@ function findPlaces(includeRating) {
             lat: place.geocodes.main.latitude,
             lng: place.geocodes.main.longitude,
             rating: place.rating ? place.rating / 2 : null,
-            distance: distance(userMarker.getLatLng(), L.latLng(place.geocodes.main.latitude, place.geocodes.main.longitude))
+            distance: distance({lat, lng}, {lat: place.geocodes.main.latitude, lng: place.geocodes.main.longitude})
         }));
-
-        console.log('Processed places:', places);
 
         if (includeRating) {
             places = places.filter(place => place.rating !== null);
@@ -126,13 +122,7 @@ function findPlaces(includeRating) {
         }
 
         places = places.slice(0, 3);
-        console.log('Final places to display:', places);
-
-        if (places.length === 0) {
-            throw new Error('No places to display after filtering');
-        }
-
-        displayResults(places, includeRating);
+        displayResults(places, {lat, lng});
     })
     .catch(error => {
         console.error('Error details:', error);
@@ -140,7 +130,7 @@ function findPlaces(includeRating) {
     });
 }
 
-function displayResults(places, includeRating) {
+function displayResults(places, userLocation) {
     const resultsDiv = document.getElementById('results');
     resultsDiv.innerHTML = '';
     map.eachLayer((layer) => {
@@ -160,6 +150,9 @@ function displayResults(places, includeRating) {
             <div class="result-details">
                 <p>Rating: ${place.rating ? place.rating.toFixed(1) : 'Not Available'}</p>
                 <p>Distance: ${place.distance.toFixed(2)} km</p>
+                <a href="https://www.google.com/maps/dir/?api=1&origin=${userLocation.lat},${userLocation.lng}&destination=${place.lat},${place.lng}" target="_blank" class="directions-link">
+                    <i class="fas fa-directions"></i> Get Directions
+                </a>
             </div>
         `;
 
@@ -178,8 +171,15 @@ function displayResults(places, includeRating) {
     }
 }
 
-function distance(latlng1, latlng2) {
-    return (latlng1.distanceTo(latlng2) / 1000); // Convert meters to kilometers
+function distance(coord1, coord2) {
+    const R = 6371; // Earth's radius in km
+    const dLat = (coord2.lat - coord1.lat) * Math.PI / 180;
+    const dLon = (coord2.lng - coord1.lng) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(coord1.lat * Math.PI / 180) * Math.cos(coord2.lat * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
 }
 
 window.onload = init;
