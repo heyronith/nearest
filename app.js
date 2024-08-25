@@ -1,5 +1,5 @@
 let map, userMarker;
-const API_KEY = 'fsq3sZuimynM0NUYFhl4UBhd/YqEyOo4UB2NJtUyonpJqUU='; // Replace with your actual API key
+const API_KEY = 'fsq31HBm6WcAeXBn0EXKzX+1TV9Iq4xpQ11LXokWZ+CzsKI='; // Replace with your actual API key
 
 function init() {
     document.getElementById('nearest-btn').addEventListener('click', () => findPlaces(false));
