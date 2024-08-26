@@ -1,5 +1,5 @@
 let map, userMarker;
-const API_KEY = 'fsq3sZuimynM0NUYFhl4UBhd/YqEyOo4UB2NJtUyonpJqUU='; // Replace with your actual Foursquare API key
+const API_KEY = 'fsq3/B5TwCXvV4aKuaLLDmvdFpsTWmOP44CWI6dcRBl4ZQo='; // Replace with your actual Foursquare API key
 
 function init() {
     document.getElementById('nearest-btn').addEventListener('click', () => findPlaces(false));
