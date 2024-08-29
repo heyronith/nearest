@@ -1,8 +1,8 @@
 let map, userMarker;
 
 // We'll load these from environment variables or a secure configuration in a real production setup
-const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoicm9uaXRoc2hhcm1pbGEiLCJhIjoiY20wYnN0OWp2MGFhdTJrcHhtMDlzYTBkeiJ9.0FB0MmTbjbT-KNOcqvZXgg';
-const FOURSQUARE_API_KEY = 'fsq3hgre3kJzErOP5MM+wpqXqIKxguCtEElSVG2Rc0+jDK0=';
+const MAPBOX_ACCESS_TOKEN = process.env.MAPBOX_API_KEY;
+const FOURSQUARE_API_KEY = 'process.env.FOURSQUARE_API_KEY;
 
 mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
