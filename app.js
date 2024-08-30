@@ -1,8 +1,11 @@
 let map, userMarker;
+let currentSearchRadius = 5000; // Initial search radius in meters
+let allResults = [] // Initial search radius in meters
+let displayedResultsCount = 0; // Keep track of how many results are displayed
 
 // We'll load these from environment variables or a secure configuration in a real production setup
-const MAPBOX_ACCESS_TOKEN = process.env.MAPBOX_API_KEY;
-const FOURSQUARE_API_KEY = 'process.env.FOURSQUARE_API_KEY;
+const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoicm9uaXRoc2hhcm1pbGEiLCJhIjoiY20wYnN0OWp2MGFhdTJrcHhtMDlzYTBkeiJ9.0FB0MmTbjbT-KNOcqvZXgg';
+const FOURSQUARE_API_KEY = 'fsq3hgre3kJzErOP5MM+wpqXqIKxguCtEElSVG2Rc0+jDK0=';
 
 mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
@@ -10,7 +13,7 @@ function init() {
     document.getElementById('nearest-btn').addEventListener('click', findPlaces);
     document.getElementById('search-btn').addEventListener('click', searchLocation);
     initAutocomplete();
-    addNearestScoreInfo();
+    addNScoreInfo();
 }
 
 function initMap(lng, lat) {
@@ -89,16 +92,16 @@ function clearSuggestions() {
     }
 }
 
-function addNearestScoreInfo() {
+function addNScoreInfo() {
     const infoLink = document.createElement('a');
     infoLink.href = '#';
-    infoLink.textContent = "What's Nearest Score?";
+    infoLink.textContent = "What's n-score?";
     infoLink.style.cssText = 'position: fixed; bottom: 10px; left: 10px; z-index: 1000;';
     
     const infoDiv = document.createElement('div');
     infoDiv.innerHTML = `
-        <h3>About Nearest Score</h3>
-        <p>The Nearest Score is a measure that combines the quality and popularity of a place. It takes into account:</p>
+        <h3>About n-score</h3>
+        <p>The n-score is a measure that combines the quality and popularity of a place. It takes into account:</p>
         <ul>
             <li>The place's rating</li>
             <li>The number of reviews</li>
@@ -161,6 +164,9 @@ function updateMap(lng, lat, popupText) {
 }
 
 function findPlaces() {
+    currentSearchRadius = 5000; // Reset search radius
+    allResults = []; // Clear previous results
+    displayedResultsCount = 0; // Reset displayed results count
     if (!userMarker) {
         getUserLocation()
             .then(coords => {
@@ -174,7 +180,7 @@ function findPlaces() {
     }
 }
 
-function calculateNearestScore(rating, reviews) {
+function calculateNScore(rating, reviews) {
     const ratingWeight = 0.7;
     const reviewsWeight = 0.3;
 
@@ -192,9 +198,13 @@ function getDescriptiveScore(score) {
     return "Average";
 }
 
+function kmToMiles(km) {
+    return km * 0.621371;
+}
+
 function fetchPlaces(lat, lng) {
     const category = document.getElementById('category').value;
-    const url = `https://api.foursquare.com/v3/places/search?query=${category}&ll=${lat},${lng}&sort=DISTANCE&limit=50&fields=name,geocodes,rating,stats,distance,location`;
+    const url = `https://api.foursquare.com/v3/places/search?query=${category}&ll=${lat},${lng}&sort=DISTANCE&limit=50&fields=name,geocodes,rating,stats,distance,location&radius=${currentSearchRadius}`;
 
     showLoading();
 
@@ -222,63 +232,72 @@ function fetchPlaces(lat, lng) {
             reviews: place.stats?.total_ratings || 0,
             distance: place.distance,
             address: place.location.formatted_address,
-            nearestScore: calculateNearestScore(place.rating || 0, place.stats?.total_ratings || 0)
+            nScore: calculateNScore(place.rating || 0, place.stats?.total_ratings || 0)
         }));
 
-        // Normalize distance and nearest score
+        // Normalize distance and n-score
         const maxDistance = Math.max(...places.map(p => p.distance));
-        const maxScore = Math.max(...places.map(p => p.nearestScore));
+        const maxScore = Math.max(...places.map(p => p.nScore));
 
         places.forEach(place => {
             place.normalizedDistance = 1 - (place.distance / maxDistance);
-            place.normalizedScore = place.nearestScore / maxScore;
+            place.normalizedScore = place.nScore / maxScore;
             place.combinedScore = (place.normalizedDistance + place.normalizedScore) / 2;
-            place.descriptiveScore = getDescriptiveScore(place.nearestScore);
+            place.descriptiveScore = getDescriptiveScore(place.nScore);
         });
 
         // Sort places by combined score
         places.sort((a, b) => b.combinedScore - a.combinedScore);
 
-        displayResults(places.slice(0, 3), {lat, lng});
+        // Add new results to allResults, avoiding duplicates
+        allResults = [...new Set([...allResults, ...places])];
+
+        displayResults({lat, lng});
     })
     .catch(handleError)
     .finally(hideLoading);
 }
 
-function displayResults(places, userLocation) {
+function displayResults(userLocation) {
     const resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = '';
+    const newResults = allResults.slice(displayedResultsCount, displayedResultsCount + 3);
+    displayedResultsCount += newResults.length;
 
-    // Clear existing markers
-    if (map.markers) {
-        map.markers.forEach(marker => {
-            if (marker !== userMarker) {
-                marker.remove();
-            }
-        });
+    // Clear existing markers if this is the first batch
+    if (displayedResultsCount <= 3) {
+        resultsDiv.innerHTML = '';
+        if (map.markers) {
+            map.markers.forEach(marker => {
+                if (marker !== userMarker) {
+                    marker.remove();
+                }
+            });
+        }
+        map.markers = [userMarker];
     }
-    map.markers = [userMarker];
 
-    places.forEach((place, index) => {
-        const marker = new mapboxgl.Marker()
+    newResults.forEach((place, index) => {
+        const isNewResult = displayedResultsCount > 3;
+        const markerColor = isNewResult ? '#FF5733' : '#4CAF50'; // Red for new, Green for original
+        const marker = new mapboxgl.Marker({ color: markerColor })
             .setLngLat([place.lng, place.lat])
             .addTo(map);
 
         map.markers.push(marker);
 
         const popup = new mapboxgl.Popup({offset: 25})
-            .setHTML(`<strong>${place.name}</strong><br>Rating: ${place.rating.toFixed(1)} (${place.reviews} reviews)<br>Nearest Score: ${place.descriptiveScore}`);
+            .setHTML(`<strong>${place.name}</strong><br>Rating: ${place.rating.toFixed(1)} (${place.reviews} reviews)<br>n-score: ${place.descriptiveScore}`);
 
         marker.setPopup(popup);
 
         const placeElement = document.createElement('div');
-        placeElement.className = 'result-item';
+        placeElement.className = `result-item ${isNewResult ? 'new-result' : ''}`;
         placeElement.innerHTML = `
-            <h3>${index + 1}. ${place.name}</h3>
+            <h3>${displayedResultsCount - newResults.length + index + 1}. ${place.name}</h3>
             <div class="result-details">
                 <p>Rating: ${place.rating.toFixed(1)} (${place.reviews} reviews)</p>
-                <p>Nearest Score: <span class="nearest-score">${place.descriptiveScore} (${place.nearestScore.toFixed(2)})</span></p>
-                <p>Distance: ${(place.distance / 1000).toFixed(2)} km</p>
+                <p>n-score: <span class="n-score">${place.descriptiveScore} (${place.nScore.toFixed(2)})</span></p>
+                <p>Distance: ${kmToMiles(place.distance / 1000).toFixed(2)} miles</p>
                 <p>Address: ${place.address}</p>
                 <a href="https://www.google.com/maps/dir/?api=1&origin=${userLocation.lat},${userLocation.lng}&destination=${place.lat},${place.lng}" target="_blank" class="directions-link">
                     <i class="fas fa-directions"></i> Get Directions
@@ -296,14 +315,33 @@ function displayResults(places, userLocation) {
         resultsDiv.appendChild(placeElement);
     });
 
-    if (places.length === 0) {
-        resultsDiv.innerHTML = '<p>No places found. Try a different location or category.</p>';
+    // Remove existing "Find places slightly further away" button
+    const existingButton = document.getElementById('further-button');
+    if (existingButton) {
+        existingButton.remove();
+    }
+
+    if (newResults.length === 0) {
+        resultsDiv.innerHTML += '<p>No more places found. Try a different location or category.</p>';
+    } else {
+        // Add "Find places slightly further away" button at the bottom
+        const furtherButton = document.createElement('button');
+        furtherButton.id = 'further-button';
+        furtherButton.textContent = 'Find places slightly further away';
+        furtherButton.addEventListener('click', findFurtherPlaces);
+        resultsDiv.appendChild(furtherButton);
     }
 
     // Fit map to show all markers
     const bounds = new mapboxgl.LngLatBounds();
     map.markers.forEach(marker => bounds.extend(marker.getLngLat()));
     map.fitBounds(bounds, {padding: 50});
+}
+
+function findFurtherPlaces() {
+    currentSearchRadius += 5000; // Increase search radius by 5 km
+    const {lng, lat} = userMarker.getLngLat();
+    fetchPlaces(lat, lng);
 }
 
 function handleError(error) {
@@ -325,7 +363,5 @@ function hideLoading() {
         loadingDiv.remove();
     }
 }
-
-window.onload = init;
 
 window.onload = init;
